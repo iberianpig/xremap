@@ -25,27 +25,33 @@ impl Client for GnomeClient {
     }
 
     fn current_application(&mut self) -> Option<String> {
+        use serde::{Deserialize, Serialize};
+        #[derive(Serialize, Deserialize)]
+        struct ActiveWindow {
+            #[serde(default)]
+            wm_class: String,
+            #[serde(default)]
+            title: String,
+            #[serde(default)]
+            focus: bool,
+        }
+
         self.connect();
         let connection = match &mut self.connection {
             Some(connection) => connection,
             None => return None,
         };
 
-        let code = "
-            const actor = global.get_window_actors().find(a=>a.meta_window.has_focus()===true)
-            actor && actor.get_meta_window().get_wm_class()
-        ";
         if let Ok(message) = connection.call_method(
             Some("org.gnome.Shell"),
-            "/org/gnome/Shell",
-            Some("org.gnome.Shell"),
-            "Eval",
-            &(code),
+            "/dev/iberianpig/Appmatcher",
+            Some("dev.iberianpig.Appmatcher"),
+            "ActiveWindow",
+            &(),
         ) {
-            if let Ok((_actor, json)) = message.body::<(bool, String)>() {
-                if let Ok(wm_class) = serde_json::from_str::<String>(&json) {
-                    return Some(wm_class);
-                }
+            if let Ok(json) = message.body::<String>() {
+                let w: ActiveWindow = serde_json::from_str(&json).unwrap();
+                return Some(w.wm_class);
             }
         }
         None
